@@ -82,6 +82,20 @@ remember earlier turns. Add a `conversation` block to the config:
 returns a conversation id (`chat-api-thread-id.example.json`). Without it every turn is a new
 chat, and multi-turn results are marked INVALID instead of DEFENDED.
 
+**LLM judge** (optional, recommended — a second opinion on the ambiguous cases):
+```bash
+export JUDGE_BASE_URL=https://api.your-llm.com/v1   # any chat-completions-compatible endpoint
+export JUDGE_MODEL=your-model                       # (or reuse ADV_BASE_URL / ADV_MODEL / ADV_API_KEY)
+export JUDGE_API_KEY=...                            # kept in the shell, never in a file
+jinx run --target my-target.json --judge           # 2nd opinion on ambiguous verdicts
+jinx manual --target chrome-agent --judge          # same, in the copy-paste flow
+jinx report --judge                                 # + an analyst wrap-up in the report
+```
+Off by default (scoring stays deterministic and free). It only reviews **ambiguous** verdicts
+(ECHO / DEFENDED / INVALID) and **never downgrades a proven hit** — a changed verdict is tagged
+`LEAK (LLM judge; rules said DEFENDED)`. The 1050-cell matrix stays rule-based (to avoid ~1000
+LLM calls). With nothing configured, `--judge` prints a note and falls back to rule-based.
+
 **Model sweep** (does the result depend on the model behind the agent?):
 ```bash
 jinx run --target my-target.json --models model-a,model-b,model-c --pack   # same suite, once per model
