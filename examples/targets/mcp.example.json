@@ -1,0 +1,9 @@
+{
+  "type": "mcp",
+  "name": "my-mcp-agent",
+  "command": ["python3", "-m", "your_agent.mcp_server"],
+  "tool": "chat",
+  "prompt_arg": "message",
+  "answer_path": ["content", 0, "text"],
+  "env": { "AGENT_API_KEY": "${AGENT_API_KEY}" }
+}

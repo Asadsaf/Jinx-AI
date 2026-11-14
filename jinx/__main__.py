@@ -8,6 +8,8 @@ Jinx -- AI-agent red-team. Run: python -m jinx <command>
         also: --oos TEXT --tool TEXT
         --models a,b,c   run the same suite once per model and compare (config needs
                          "<<MODEL>>" or "model_path"; or a "models" list in the config)
+  connect           choose how to reach the target (API / MCP / Browser / Claude-in-Chrome)
+                    and scaffold a target config to use with `run`
   models BASE [--all]  compare models run against a target: counts + every cell they disagree on
                     (--all: every cell two or more models ran)
   log --target BASE [--model M] --mode MODE --cell KEY --verdict V --why TEXT
@@ -168,6 +170,35 @@ def bundle(name):
     print("wrote", out, "-- review it before it goes anywhere")
 
 
+def connect():
+    """Interactive: pick a transport, scaffold a target config (or show the Chrome guide)."""
+    print(BANNER)
+    print("How do you reach the target AI agent?\n"
+          "  1) API (HTTP)           - the agent has a REST / chat API\n"
+          "  2) MCP server           - the agent is exposed over the Model Context Protocol\n"
+          "  3) Browser (Playwright) - script the vendor's web UI from the terminal\n"
+          "  4) Claude in Chrome     - drive the vendor UI in YOUR logged-in browser (assisted)\n")
+    choice = input("choose 1-4: ").strip()
+    if choice == "4":
+        guide = os.path.join(_ROOT, "docs", "CLAUDE_IN_CHROME.md")
+        print("\n" + (open(guide).read() if os.path.exists(guide) else "see docs/CLAUDE_IN_CHROME.md"))
+        return
+    tmpl = {"1": "chat-api.example.json", "2": "mcp.example.json", "3": "browser.example.json"}.get(choice)
+    if not tmpl:
+        sys.exit("pick 1, 2, 3, or 4")
+    name = (input("name this target file [my-target.json]: ").strip() or "my-target.json")
+    if not name.endswith(".json"):
+        name += ".json"
+    shutil.copyfile(os.path.join(_ROOT, "examples", "targets", tmpl), name)
+    hint = {
+        "1": "Edit url / headers / body / answer_path. Keep the key in the shell: export TARGET_API_KEY=...",
+        "2": "Edit command / tool / prompt_arg / answer_path. Any server env vars go in \"env\".",
+        "3": "Edit url + the CSS selectors. First: pip install -e '.[browser]' && playwright install chromium",
+    }[choice]
+    print(f"\nwrote {name}\n{hint}\n\nthen run:  python -m jinx run --target {name}")
+    print("\nAuthorization: only run against a target you own or are explicitly authorized to test.")
+
+
 def main():
     args = sys.argv[1:]
     cmd = args[0] if args else "info"
@@ -205,6 +236,8 @@ def main():
         else:
             from . import catcher
             {"new": catcher.new, "hits": catcher.hits, "delete": catcher.delete}[sub]()
+    elif cmd == "connect":
+        connect()
     elif cmd == "run":
         run(args[1:])
     elif cmd == "selftest":

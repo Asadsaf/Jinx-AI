@@ -4,6 +4,8 @@
    "answer_path": [...]}                      -> HTTPTarget (any chat API)
   {"type": "browser", "name": "...", "url": "...", "input_sel": "...", "send_sel": "...",
    "answer_sel": "...", "headless": false}   -> BrowserTarget (needs playwright)
+  {"type": "mcp", "name": "...", "command": ["python3","server.py"], "tool": "chat",
+   "prompt_arg": "message", "answer_path": [...]}  -> MCPTarget (agent over MCP)
   {"type": "mock", "mode": "vulnerable|hardened|hardened-quoting"}  -> local test agent
 
 Secrets never go in the file: write "${MY_API_KEY}" and export MY_API_KEY in the shell.
@@ -23,6 +25,9 @@ def load(path):
         from .harness import BrowserTarget
         return BrowserTarget(cfg["url"], cfg["input_sel"], cfg["send_sel"], cfg["answer_sel"],
                              name=cfg.get("name", "browser"), headless=cfg.get("headless", False))
+    if kind == "mcp":
+        from .harness import MCPTarget
+        return MCPTarget(cfg)
     if kind == "mock":
         from .testbed import MockAgent
         return MockAgent(cfg.get("mode", "vulnerable"))

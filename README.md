@@ -43,7 +43,8 @@ jinx info                            # library stats + audit
 ```
 Run against a target:
 ```bash
-cp examples/targets/chat-api.example.json my-target.json    # edit url / body / answer_path
+jinx connect                                                # choose API / MCP / Browser / Claude-in-Chrome, scaffold a config
+cp examples/targets/chat-api.example.json my-target.json    # or copy a template yourself
 export TARGET_API_KEY=...                                   # secrets stay in the shell, never in the file
 jinx catcher new                                            # endpoint for out-of-band fetches
 jinx run --target my-target.json                            # all 16 ATLAS tests
@@ -80,13 +81,16 @@ in Claude Code with the Claude in Chrome extension and say "run jinx on <vendor>
 surface, plants payloads for indirect injection, checks the catcher and writes the evidence.
 `jinx run` and `jinx run-sheet` print this note (hide it with `JINX_NO_NOTE=1`).
 
-Three ways to reach a target (docs/CONNECT_QUICK.md):
+Four ways to reach a target — `jinx connect` picks one interactively and scaffolds the config
+(docs/CONNECT_QUICK.md):
 - **API** (`"type": "http"`): fully automated from the terminal.
-- **Browser, scripted** (`"type": "browser"`, `pip install -e .[browser]` then `playwright install chromium`):
+- **MCP** (`"type": "mcp"`): the agent is exposed over the Model Context Protocol; Jinx is the MCP
+  client and calls its tool once per probe. Try it offline: `jinx run --target examples/targets/mcp-mock.json`.
+- **Browser, scripted** (`"type": "browser"`, `pip install -e '.[browser]'` then `playwright install chromium`):
   opens the vendor UI, you log in once, Jinx types and reads the answers.
-- **Browser, by hand or with an assistant**: `jinx run-sheet` writes every prompt to
-  `out/jinx_run_sheet.md` for UI-only agents and planted-content delivery. In Claude Code the
-  `jinx-engagement` skill runs this whole routine.
+- **Claude in Chrome** (assisted): drive the vendor's own UI in your logged-in browser — the most
+  flexible transport, it reaches surfaces an API can't. Full steps: **docs/CLAUDE_IN_CHROME.md**. In
+  Claude Code the `jinx-engagement` skill runs the whole routine ("run jinx on &lt;vendor&gt;").
 
 Other commands: `jinx catalog`, `jinx atlas`, `jinx engage new <vendor>`, `jinx bundle <vendor>`,
 `jinx catcher serve` (self-hosted catcher), `jinx cleanup [--apply]`, `jinx docs`.
@@ -109,10 +113,11 @@ technique (what to make the agent do) -> framing (how it is asked) -> encoding (
 -> delivery (direct message or planted content). `jinx/catalog.py` bundles related techniques
 under one ATLAS test so one run covers what used to take several.
 
-## Connect (3 ways) -- see docs/CONNECT_QUICK.md
+## Connect (4 ways) -- `jinx connect` chooses one and scaffolds a config; see docs/CONNECT_QUICK.md
 - **A. API** (`HTTPTarget`) -- automated, for agents with an API.
-- **B. Browser, scripted** (`BrowserTarget`, Playwright) -- for UI-only agents.
-- **C. Browser assistant** -- export a run sheet and drive the vendor UI in your own authorized session.
+- **B. MCP** (`MCPTarget`) -- for agents exposed over the Model Context Protocol.
+- **C. Browser, scripted** (`BrowserTarget`, Playwright) -- for UI-only agents.
+- **D. Claude in Chrome** -- drive the vendor UI in your own logged-in session; see docs/CLAUDE_IN_CHROME.md.
 
 ## Teardown
 `python -m jinx cleanup --apply` deletes our catcher and local run state. Engagement-specific

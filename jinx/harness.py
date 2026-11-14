@@ -117,6 +117,78 @@ class HTTPTarget(Target):
         return {"text": text, "raw": payload, "conversation": nxt}
 
 
+# ---------------------------------------------------------------- MCP target
+class MCPTarget(Target):
+    """Reach an agent exposed over the Model Context Protocol (stdio server).
+
+    cfg = {"command": ["python3","server.py"], "tool": "chat", "prompt_arg": "message",
+           "answer_path": [...optional...], "env": {...optional...}}
+    Jinx acts as the MCP client: initialize -> tools/call(tool, {prompt_arg: payload}) per probe.
+    Default answer = the text parts of result.content[]; answer_path overrides that.
+    """
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.name = cfg.get("name", "mcp")
+        self.tool = cfg.get("tool", "chat")
+        self.prompt_arg = cfg.get("prompt_arg", "message")
+        self.answer_path = cfg.get("answer_path")
+        self._p = None
+        self._id = 0
+
+    def _start(self):
+        import subprocess
+        env = dict(os.environ)
+        for k, v in (self.cfg.get("env") or {}).items():
+            env[k] = os.path.expandvars(v)
+        self._p = subprocess.Popen(self.cfg["command"], stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                   env=env, text=True, bufsize=1)
+        self._rpc("initialize", {"protocolVersion": "2024-11-05", "capabilities": {},
+                                 "clientInfo": {"name": "jinx", "version": "2.2.0"}})
+        self._line({"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}})
+
+    def _line(self, obj):
+        self._p.stdin.write(json.dumps(obj) + "\n")
+        self._p.stdin.flush()
+
+    def _rpc(self, method, params):
+        self._id += 1
+        mid = self._id
+        self._line({"jsonrpc": "2.0", "id": mid, "method": method, "params": params})
+        while True:
+            line = self._p.stdout.readline()
+            if not line:
+                raise RuntimeError("MCP server closed the connection")
+            try:
+                msg = json.loads(line)
+            except ValueError:
+                continue
+            if msg.get("id") == mid:
+                if "error" in msg:
+                    raise RuntimeError(f"MCP error: {msg['error']}")
+                return msg.get("result", {})
+
+    def send(self, prompt, conversation=None):
+        if self._p is None:
+            self._start()
+        res = self._rpc("tools/call", {"name": self.tool, "arguments": {self.prompt_arg: prompt}})
+        if self.answer_path is not None:
+            text = _dig(res, self.answer_path)
+        else:
+            parts = res.get("content") or []
+            text = "\n".join(c.get("text", "") for c in parts
+                             if isinstance(c, dict) and c.get("type") == "text")
+        return {"text": text or "", "raw": res}
+
+    def close(self):
+        if self._p:
+            try:
+                self._p.terminate()
+            except Exception:  # noqa: BLE001
+                pass
+            self._p = None
+
+
 # ---------------------------------------------------------------- scoring
 
 # renderable markup that would auto-fetch or be clickable (AML.T0077)

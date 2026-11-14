@@ -1,0 +1,1 @@
+{"type": "mcp", "name": "mcp-mock", "command": ["python3", "-m", "jinx.mcp_mock_server"], "tool": "chat", "prompt_arg": "message"}
