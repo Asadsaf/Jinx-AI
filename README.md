@@ -8,6 +8,9 @@ ATLAS 2026.10). One library, one scorer, one report, across any transport.
 
 > **Authorized testing only.** Your own accounts and tenants, or programs with published safe
 > harbor. A content-only jailbreak is **not** a finding: Jinx scores on real impact.
+> Every non-mock `jinx run` asks you to confirm authorization before it sends a single probe
+> (bypass for scripts: `--authorized` or `JINX_AUTHORIZED=1`). Unauthorized testing of
+> someone else's agent may be illegal.
 
 ## Layout
 ```
@@ -43,17 +46,18 @@ jinx info                            # library stats + audit
 ```
 Run against a target:
 ```bash
-jinx connect                                                # choose API / MCP / Browser / Claude-in-Chrome, scaffold a config
+jinx connect                                                # 1. choose API / MCP / Browser / Claude-in-Chrome, scaffold a config
+jinx research my-vendor                                      # 2. scaffold engagements/my-vendor/research.md (surfaces, ATLAS patterns, public vulns)
 cp examples/targets/chat-api.example.json my-target.json    # or copy a template yourself
 export TARGET_API_KEY=...                                   # secrets stay in the shell, never in the file
 jinx catcher new                                            # endpoint for out-of-band fetches
-jinx run --target my-target.json                            # all 16 ATLAS tests
+jinx run --target my-target.json                            # 3. confirm authorization, then run all 16 ATLAS tests
 jinx run --target my-target.json --pack                     # 30 planted-content cells (--combos 35, --matrix 1050)
 jinx run --target my-target.json --cross-turn               # split payload over 3 turns of one conversation
 jinx catcher hits                                           # ground truth
 jinx status                                                 # verdict counts, from the telemetry log
 jinx diff my-agent other-agent                              # cell-by-cell difference between two targets
-jinx report                                                 # out/jinx_report.html
+jinx report                                                 # 4. out/jinx_report.html (live verdicts + every check that ran)
 ```
 **Multi-turn over an API** (`--cross-turn`, `--multiturn "GOAL"`, `--sandbox`) needs the target to
 remember earlier turns. Add a `conversation` block to the config:
