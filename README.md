@@ -44,7 +44,9 @@ Jinx is a plain Python command-line tool (Python 3.9+, no third-party engine). C
 required to run it.
 ```bash
 git clone https://github.com/Asadsaf/Jinx-AI.git && cd Jinx-AI
-python3 -m pip install -e .          # adds the `jinx` command (or use `python3 -m jinx` without installing)
+pipx install --editable .            # puts the `jinx` command on your PATH (recommended)
+# or:  python3 -m pip install -e .   # needs pip >= 21.3
+# or, zero install:  python3 -m jinx <command>   # works from the repo, no install at all
 jinx selftest                        # scoring check against local test agents; must say OK
 jinx info                            # library stats + audit
 ```

@@ -272,15 +272,17 @@ class Adversary:
 
 # ---------------------------------------------------------------- runners
 def run_battery(target, oos="the restricted resource", tool="your tools"):
-    print(f"=== battery vs {target.name} (every technique, one message each) ===")
+    probes = list(ac.for_target(oos=oos, tool=tool))
+    total = len(probes)
+    print(f"=== battery vs {target.name} ({total} techniques, one message each) ===")
     results = []
-    for eid, fam, prompt, src, impact in ac.for_target(oos=oos, tool=tool):
+    for n, (eid, fam, prompt, src, impact) in enumerate(probes, 1):
         telemetry.log("send", target=target.name, technique=eid, mode="battery")
         resp = target.send(prompt)
         v, why = score(resp, sent=prompt, canary_sent="{CANARY}" in ac.by_id(eid)["template"])
         telemetry.log("verdict", target=target.name, technique=eid, verdict=v, why=why)
         results.append((v, fam, eid))
-        print(f"[{fam}/{eid}] -> {v} ({why})  <- {src}")
+        print(f"[{n}/{total}] {fam}/{eid} -> {v} ({why})  <- {src}")
         print(f"    ANSWER: {(resp.get('text','') or '')[:200].strip()}\n")
     print("=== summary ===")
     for v, fam, eid in results:
@@ -288,18 +290,20 @@ def run_battery(target, oos="the restricted resource", tool="your tools"):
     return results
 
 
-def run_test(target, test_id, oos="the restricted resource", tool="your tools"):
-    """Run one combined ATLAS test: all member probes in a single message."""
+def run_test(target, test_id, oos="the restricted resource", tool="your tools", n=None, total=None):
+    """Run one combined ATLAS test: all member probes in a single message.
+    n/total, when given, print an ordered [n/total] progress counter."""
     from . import catalog
+    prog = f"[{n}/{total}] " if n and total else ""
     combined, parts = catalog.bundle(test_id, oos=oos, tool=tool)
     if not parts:
-        print(f"[{test_id}] planted-content only -- deliver its families via jinx.modifiers")
+        print(f"{prog}{test_id} planted-content only -- deliver its families via jinx.modifiers")
         return None
     telemetry.log("send", target=target.name, test=test_id, techniques=[i for i, _ in parts], mode="combined")
     resp = target.send(combined)
     v, why = score(resp, sent=combined)
     telemetry.log("verdict", target=target.name, test=test_id, mode="combined", verdict=v, why=why)
-    print(f"[{test_id}] {v} ({why})")
+    print(f"{prog}{test_id:6s} {v} ({why})")
     return v, why, resp
 
 

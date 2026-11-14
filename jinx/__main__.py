@@ -148,7 +148,9 @@ def run(args):
             harness.run_sandbox_chain(t, oos=oos, tool=tool)
         else:
             ids = [_opt(args, "--test")] if "--test" in args else [x["id"] for x in catalog.TESTS]
-            res = [harness.run_test(t, i, oos=oos, tool=tool) for i in ids]
+            tot = len(ids)
+            print(f"=== {t.name}: {tot} ATLAS tests, in order ===")
+            res = [harness.run_test(t, i, oos=oos, tool=tool, n=k, total=tot) for k, i in enumerate(ids, 1)]
             _tally([r[0] for r in res if r])
 
     models = _opt(args, "--models")
@@ -194,39 +196,91 @@ def bundle(name):
     print("wrote", out, "-- review it before it goes anywhere")
 
 
-def connect():
-    """Interactive: pick a transport, scaffold a target config (or show the Chrome guide)."""
-    print(BANNER)
-    print("How do you reach the target AI agent?\n"
-          "  1) API (HTTP)           - the agent has a REST / chat API\n"
-          "  2) MCP server           - the agent is exposed over the Model Context Protocol\n"
-          "  3) Browser (Playwright) - script the vendor's web UI from the terminal\n"
-          "  4) Claude in Chrome     - drive the vendor UI in YOUR logged-in browser (assisted)\n")
-    choice = input("choose 1-4: ").strip()
+CONNECT_MENU = (
+    "How do you reach the target AI agent?\n"
+    "  1) API (HTTP)           - the agent has a REST / chat API\n"
+    "  2) MCP server           - the agent is exposed over the Model Context Protocol\n"
+    "  3) Browser (Playwright) - script the vendor's web UI from the terminal\n"
+    "  4) Claude in Chrome     - drive the vendor UI in YOUR logged-in browser (assisted)\n")
+
+CONNECT_HELP = (
+    "\n  1-4   pick how you reach the agent\n"
+    "  h     show this help\n"
+    "  b     go back to the menu (if you picked the wrong option)\n"
+    "  q     quit connect (back to the shell)\n")
+
+
+def _print_flow(choice, target=None):
+    """Print the rest of the engagement, tailored to the transport. Every option ends at
+    the report, so no path dead-ends after connect."""
+    print("\n--- next, the rest of the engagement (every option ends at the HTML report) ---")
+    print("  1. research the vendor:   jinx research <vendor>")
+    print("       -> fills engagements/<vendor>/research.md (surfaces, ATLAS patterns, public vulns)")
     if choice == "4":
-        guide = os.path.join(_ROOT, "docs", "CLAUDE_IN_CHROME.md")
-        print("\n" + (open(guide).read() if os.path.exists(guide) else "see docs/CLAUDE_IN_CHROME.md"))
-        return
-    tmpl = {"1": "chat-api.example.json", "2": "mcp.example.json", "3": "browser.example.json"}.get(choice)
-    if not tmpl:
-        sys.exit("pick 1, 2, 3, or 4")
-    name = (input("name this target file [my-target.json]: ").strip() or "my-target.json")
-    if not name.endswith(".json"):
-        name += ".json"
-    shutil.copyfile(os.path.join(_ROOT, "examples", "targets", tmpl), name)
-    hint = {
-        "1": "Edit url / headers / body / answer_path. Keep the key in the shell: export TARGET_API_KEY=...",
-        "2": "Edit command / tool / prompt_arg / answer_path. Any server env vars go in \"env\".",
-        "3": "Edit url + the CSS selectors. First: pip install -e '.[browser]' && playwright install chromium",
-    }[choice]
-    print(f"\nwrote {name}\n{hint}\n\nthen run:  python -m jinx run --target {name}")
+        print("  2. export the run sheet:  jinx run-sheet \"the resource you want it to reach\"")
+        print("  3. drive each row in Claude in Chrome (steps above), and record each verdict:")
+        print("       jinx log --target <name> --mode ui --cell JX-01 --verdict DEFENDED --why \"...\"")
+        print("  4. build the report:      jinx report        -> out/jinx_report.html")
+    else:
+        print(f"  2. run it (asks you to confirm authorization first):")
+        print(f"       jinx run --target {target}            # all 16 ATLAS tests")
+        print(f"       jinx run --target {target} --pack     # + planted-content cells (--combos, --matrix, --cross-turn)")
+        print("  3. build the report:      jinx report        -> out/jinx_report.html")
     print("\nAuthorization: only run against a target you own or are explicitly authorized to test.")
+
+
+def connect():
+    """Interactive: pick a transport, scaffold a target config (or show the Chrome guide),
+    then print the whole flow through to the report. Loops so a wrong pick can go back."""
+    print(BANNER)
+    while True:
+        print(CONNECT_MENU)
+        try:
+            choice = input("choose 1-4  (h=help, q=quit): ").strip().lower()
+        except EOFError:
+            return
+        if choice in ("q", "quit", "exit"):
+            print("bye.")
+            return
+        if choice in ("h", "help", "?"):
+            print(CONNECT_HELP)
+            continue
+        if choice == "4":
+            guide = os.path.join(_ROOT, "docs", "CLAUDE_IN_CHROME.md")
+            print("\n" + (open(guide).read() if os.path.exists(guide) else "see docs/CLAUDE_IN_CHROME.md"))
+            _print_flow("4")
+        elif choice in ("1", "2", "3"):
+            tmpl = {"1": "chat-api.example.json", "2": "mcp.example.json", "3": "browser.example.json"}[choice]
+            name = (input("name this target file [my-target.json]: ").strip() or "my-target.json")
+            if not name.endswith(".json"):
+                name += ".json"
+            shutil.copyfile(os.path.join(_ROOT, "examples", "targets", tmpl), name)
+            hint = {
+                "1": "Edit url / headers / body / answer_path. Keep the key in the shell: export TARGET_API_KEY=...",
+                "2": "Edit command / tool / prompt_arg / answer_path. Any server env vars go in \"env\".",
+                "3": "Edit url + the CSS selectors. First: pip install -e '.[browser]' && playwright install chromium",
+            }[choice]
+            print(f"\nwrote {name}\n{hint}")
+            _print_flow(choice, name)
+        else:
+            print("  pick 1, 2, 3 or 4  (h = help, q = quit)")
+            continue
+        try:
+            again = input("\npress Enter to finish, or 'b' to go back to the menu: ").strip().lower()
+        except EOFError:
+            return
+        if again in ("b", "back"):
+            print()
+            continue
+        return
 
 
 def main():
     args = sys.argv[1:]
     cmd = args[0] if args else "info"
-    if cmd == "info":
+    if cmd in ("help", "-h", "--help"):
+        print(BANNER + __doc__)
+    elif cmd == "info":
         info()
     elif cmd == "catalog":
         show_catalog()
