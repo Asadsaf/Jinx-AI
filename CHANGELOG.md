@@ -6,6 +6,12 @@ All notable changes to Jinx are documented here. Format loosely follows
 ## [Unreleased]
 
 ### Added
+- **Optional LLM judge** (`--judge` on `run` / `manual`, `report --judge`, or `JINX_JUDGE=1`).
+  Off by default; config via `JUDGE_BASE_URL/JUDGE_MODEL/JUDGE_API_KEY` (falls back to `ADV_*`).
+  Three roles: (1) a second opinion on **ambiguous** verdicts only (ECHO / DEFENDED / INVALID) —
+  it **never downgrades a proven hit**; (2) the adaptive driver (reuses `Adversary`/`run_multiturn`);
+  (3) an **analyst wrap-up** written into the report. The breadth matrix stays rule-based (cheap,
+  deterministic). With no config it falls back to rule-based cleanly. Recommended for best results.
 - **Saved connections** — target configs live in `targets/` (git-ignored); `jinx targets`
   lists them with type/name, `jinx targets --check` pings each (LIVE / not reachable), and
   `jinx run --target <name>` resolves a bare name to `targets/<name>.json`. `connect` saves

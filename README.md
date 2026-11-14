@@ -12,6 +12,13 @@ ATLAS 2026.10). One library, one scorer, one report, across any transport.
 
 > **Authorized testing only.** Your own accounts and tenants, or programs with published safe
 > harbor. A content-only jailbreak is **not** a finding: Jinx scores on real impact.
+
+> **💡 For the best results, add the LLM judge (`--judge`) or use the Claude-in-Chrome path
+> (option 4).** Jinx is accurate on its own — the rule-based scorer is deterministic and free —
+> but an LLM judge catches the subtle, semantic cases the rules can only mark *ambiguous*, and
+> the assisted Chrome path reaches surfaces (agents, search, automations) that a single API
+> endpoint can't. The rules stay the floor; the LLM is the amplifier. It's **off by default**
+> and never downgrades a proven hit.
 > Every non-mock `jinx run` asks you to confirm authorization before it sends a single probe
 > (bypass for scripts: `--authorized` or `JINX_AUTHORIZED=1`). Unauthorized testing of
 > someone else's agent may be illegal.
@@ -61,6 +68,7 @@ jinx run --target my-target.json                            # 3. confirm authori
 jinx run --target my-target.json --pack                     # 30 planted-content cells (--combos 35, --matrix 1050)
 jinx run --target my-target.json --cross-turn               # split payload over 3 turns of one conversation
 jinx run --target my-target.json --escalate                 # adaptive pressure ladder: climbs low->high, stops at first hit
+jinx run --target my-target.json --judge                    # + LLM second opinion on ambiguous verdicts (recommended)
 jinx catcher hits                                           # ground truth
 jinx status                                                 # verdict counts, from the telemetry log
 jinx diff my-agent other-agent                              # cell-by-cell difference between two targets

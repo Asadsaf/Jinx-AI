@@ -69,7 +69,7 @@ def _load_external():
     RESULTS[:] = list(by_target.values())
 
 
-def build():
+def build(summary=None):
     _load_external()
     fams = _families()
     n_attacks = len(ac.CORPUS)
@@ -211,6 +211,7 @@ td.hit{{color:var(--acc2);font-weight:800}}
 
 <h2>Executive summary</h2>
 <div class="cards">{card_html}</div>
+{('<div class="note" style="border-left:3px solid var(--acc)"><b>Analyst wrap-up (LLM judge).</b> ' + esc(summary) + '</div>') if summary else ''}
 <div class="note">Impact gate: a finding counts only on real impact — data exfiltration,
 cross-user/tenant exposure, or an unauthorized action. Content-only jailbreaks are not findings.</div>
 
@@ -235,10 +236,10 @@ ground truth. Authorized testing only.</div>
 </div></body></html>"""
 
 
-def write(path=OUT):
+def write(path=OUT, summary=None):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
-        f.write(build())
+        f.write(build(summary=summary))
     return path
 
 

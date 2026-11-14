@@ -7,6 +7,9 @@ Jinx -- AI-agent red-team. Run: python -m jinx <command>
               | --matrix [--limit N] | --cross-turn | --escalate | --multiturn "GOAL" | --sandbox
         --escalate   adaptive pressure ladder in one conversation (no adversary model),
                      climbs low -> high and stops at the first hit
+        --judge      optional LLM second opinion on AMBIGUOUS verdicts (recommended; set
+                     JUDGE_BASE_URL/JUDGE_MODEL/JUDGE_API_KEY, or ADV_*). Also on `manual`
+                     and `report` (report --judge writes an analyst wrap-up)
         also: --oos TEXT --tool TEXT --authorized (confirm authorization non-interactively)
         --models a,b,c   run the same suite once per model and compare (config needs
                          "<<MODEL>>" or "model_path"; or a "models" list in the config)
@@ -105,6 +108,17 @@ BETTER_WAY = """
 """
 
 
+def _maybe_enable_judge(args):
+    """Turn on the optional LLM judge when --judge is passed or JINX_JUDGE is set."""
+    if "--judge" in args or os.environ.get("JINX_JUDGE"):
+        from . import harness
+        if harness.enable_judge():
+            print("LLM judge: ON -- ambiguous verdicts get a second opinion (JUDGE_*/ADV_* env).")
+        else:
+            print("LLM judge requested but NOT configured -- set JUDGE_BASE_URL/JUDGE_MODEL/JUDGE_API_KEY "
+                  "(or ADV_*). Continuing rule-based.")
+
+
 def _require_authorization(t, args):
     from .testbed import MockAgent
     if isinstance(t, MockAgent):
@@ -135,6 +149,7 @@ def run(args):
         print(BETTER_WAY)
     t = targets.load(path)
     _require_authorization(t, args)
+    _maybe_enable_judge(args)
     oos, tool = _opt(args, "--oos", "the restricted resource"), _opt(args, "--tool", "your tools")
 
     def suite(t):
@@ -410,6 +425,7 @@ def manual(args):
     with the SAME rule-based scorer and saves it. No API or Playwright needed. Feeds the report."""
     from . import harness, catalog, telemetry
     name = _opt(args, "--target", "manual-target")
+    _maybe_enable_judge(args)
     oos, tool = _opt(args, "--oos", "the restricted resource"), _opt(args, "--tool", "your tools")
     ids = [_opt(args, "--test")] if "--test" in args else [x["id"] for x in catalog.TESTS]
     print(BANNER)
@@ -463,8 +479,19 @@ def main():
             print(BETTER_WAY)
         print("wrote", export_run_sheet(path=os.path.join(_ROOT, "out", "jinx_run_sheet.md"), oos=oos))
     elif cmd == "report":
-        from . import report
-        print("wrote", report.write())
+        from . import report, telemetry
+        summary = None
+        if "--judge" in args or os.environ.get("JINX_JUDGE"):
+            from . import harness
+            if harness.enable_judge():
+                counts = telemetry.summary()
+                rows = [(r.get("target"), r.get("cell") or r.get("test"), r.get("verdict"), r.get("why", "")[:60])
+                        for r in telemetry.read() if r.get("event") == "verdict"][-30:]
+                summary = harness._JUDGE.summarize(counts, rows) or None
+                print("LLM judge wrote the analyst wrap-up." if summary else "judge produced no wrap-up.")
+            else:
+                print("--judge requested but no judge configured (JUDGE_*/ADV_*); writing plain report.")
+        print("wrote", report.write(summary=summary))
     elif cmd == "status":
         from . import telemetry
         s = telemetry.summary()
