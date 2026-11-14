@@ -13,8 +13,14 @@ All notable changes to Jinx are documented here. Format loosely follows
   Records which rung it took. In the Claude-in-Chrome path, Claude drives the ladder.
 - `jinx research <vendor>` — scaffolds `engagements/<vendor>/research.md` (AI surfaces,
   ATLAS attack patterns, curated public precedents) to fill in before a simulation.
-- `jinx connect` walks every transport through to the report (no option dead-ends), with
-  in-menu help / back / quit. Ordered `[n/N]` progress counter on `run` and the battery.
+- `jinx connect` is now an **orchestrator**, not a chooser: it scaffolds the config, then
+  **tests the connection** (`preflight` shows the actual call — method/URL/body for HTTP, the
+  server launch + tool for MCP — and reports a connection failure, an API error, or an empty
+  reply / wrong `answer_path` that would make every technique score INVALID), and on a green
+  check it runs the suite and builds the report for you. In-menu help / back / quit; a typed
+  filename is sanitized (`.` no longer becomes `..json`). Ordered `[n/N]` progress on `run`
+  and the battery.
+- `jinx` (the preflight it uses) is also callable as part of a run's sanity check.
 - `jinx help` lists every command. `CITATION.cff` for citing the tool.
 - Authorization gate — every non-mock `jinx run` requires confirmation before sending a
   probe. Bypass non-interactively with `--authorized` or `JINX_AUTHORIZED=1`.

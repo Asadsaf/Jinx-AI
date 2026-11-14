@@ -92,8 +92,10 @@ in Claude Code with the Claude in Chrome extension and say "run jinx on <vendor>
 surface, plants payloads for indirect injection, checks the catcher and writes the evidence.
 `jinx run` and `jinx run-sheet` print this note (hide it with `JINX_NO_NOTE=1`).
 
-Four ways to reach a target — `jinx connect` picks one interactively and scaffolds the config
-(docs/CONNECT_QUICK.md):
+Four ways to reach a target — `jinx connect` is an interactive **orchestrator**: it scaffolds
+the config, **tests the connection** (shows the actual call and tells you if the agent is
+unreachable, erroring, or returning nothing — i.e. the techniques can't run), and on success
+runs the suite and builds the report for you (docs/CONNECT_QUICK.md):
 - **API** (`"type": "http"`): fully automated from the terminal.
 - **MCP** (`"type": "mcp"`): the agent is exposed over the Model Context Protocol; Jinx is the MCP
   client and calls its tool once per probe. Try it offline: `jinx run --target examples/targets/mcp-mock.json`.

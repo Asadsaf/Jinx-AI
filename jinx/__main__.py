@@ -214,36 +214,97 @@ CONNECT_HELP = (
     "  q     quit connect (back to the shell)\n")
 
 
-def _print_flow(choice, target=None):
-    """Print the rest of the engagement, tailored to the transport. Every option ends at
-    the report, so no path dead-ends after connect."""
-    print("\n--- next, the rest of the engagement (every option ends at the HTML report) ---")
-    print("  1. research the vendor:   jinx research <vendor>")
-    print("       -> fills engagements/<vendor>/research.md (surfaces, ATLAS patterns, public vulns)")
-    if choice == "4":
-        print("  2. export the run sheet:  jinx run-sheet \"the resource you want it to reach\"")
-        print("  3. drive each row in Claude in Chrome (steps above), and record each verdict:")
-        print("       jinx log --target <name> --mode ui --cell JX-01 --verdict DEFENDED --why \"...\"")
-        print("  4. build the report:      jinx report        -> out/jinx_report.html")
+def _safe_target_name(raw):
+    """Turn whatever the user typed into a sane <name>.json (so '.' doesn't become '..json')."""
+    name = (raw or "").strip().strip(".").strip()
+    if not name:
+        name = "my-target"
+    if name.endswith(".json"):
+        name = name[:-5]
+    name = "".join(c if (c.isalnum() or c in "-_") else "-" for c in name).strip("-") or "my-target"
+    return name + ".json"
+
+
+def _ask(prompt):
+    try:
+        return input(prompt).strip()
+    except EOFError:
+        return ""
+
+
+def _offer_run(name):
+    """After a green preflight, actually drive the rest: run the suite, then build the report."""
+    from . import harness, catalog, report as report_mod
+    ans = _ask("\nrun the 16 ATLAS tests now against this target? [Y/n/p=pack]: ").lower()
+    if ans.startswith("n"):
+        print(f"ok -- when ready:  jinx run --target {name}")
+        return
+    t = __import__("jinx.targets", fromlist=["load"]).load(name)
+    _require_authorization(t, [])          # same authorization gate as `jinx run`
+    if ans.startswith("p"):
+        res = harness.run_matrix(t, kind="pack")
+        _tally([v for _c, v in res])
     else:
-        print(f"  2. run it (asks you to confirm authorization first):")
-        print(f"       jinx run --target {target}            # all 16 ATLAS tests")
-        print(f"       jinx run --target {target} --pack     # + planted-content cells (--combos, --matrix, --cross-turn)")
-        print("  3. build the report:      jinx report        -> out/jinx_report.html")
-    print("\nAuthorization: only run against a target you own or are explicitly authorized to test.")
+        ids = [x["id"] for x in catalog.TESTS]
+        tot = len(ids)
+        print(f"=== {t.name}: {tot} ATLAS tests, in order ===")
+        res = [harness.run_test(t, i, n=k, total=tot) for k, i in enumerate(ids, 1)]
+        _tally([r[0] for r in res if r])
+    if not _ask("\nbuild the HTML report now? [Y/n]: ").lower().startswith("n"):
+        print("wrote", report_mod.write(), "-- open it in a browser")
+
+
+def _connect_api_like(choice):
+    """Options 1-3: scaffold the config, show how to edit it, preflight the connection, and
+    (on a green preflight for an API/MCP target) offer to run the suite + report right here."""
+    from . import harness, targets
+    tmpl = {"1": "chat-api.example.json", "2": "mcp.example.json", "3": "browser.example.json"}[choice]
+    name = _safe_target_name(_ask("name this target file [my-target.json]: ") or "my-target.json")
+    shutil.copyfile(os.path.join(_ROOT, "examples", "targets", tmpl), name)
+    hint = {
+        "1": "Edit url / headers / body / answer_path. Keep the key in the shell: export TARGET_API_KEY=...",
+        "2": "Edit command / tool / prompt_arg / answer_path. Any server env vars go in \"env\".",
+        "3": "Edit url + the CSS selectors. First: pip install -e '.[browser]' && playwright install chromium",
+    }[choice]
+    print(f"\nwrote {name}\n{hint}")
+    print("\nResearch the vendor first (optional):  jinx research <vendor>")
+    while True:
+        action = _ask(f"\nedit {name}, then: Enter = test the connection | r = research | s = skip test | b = back: ").lower()
+        if action in ("b", "back"):
+            return
+        if action in ("r", "research"):
+            v = _ask("vendor name: ") or "vendor"
+            from . import research
+            print("wrote", research.generate(v, _ROOT))
+            continue
+        if action in ("s", "skip"):
+            print(f"skipped the connection test. When ready:  jinx run --target {name}")
+            return
+        t = targets.load(name)
+        result = harness.preflight(t)
+        if result.get("ok") is True:
+            _offer_run(name)
+            return
+        if result.get("ok") is None:            # browser: can't auto-test
+            print(f"\nwhen ready:  jinx run --target {name}")
+            return
+        if result.get("fatal"):
+            print("\nfix the config above and press Enter to test again (or 'b' to go back).")
+            continue
+        # non-fatal (empty answer / answer_path): let them retry or run anyway
+        if _ask("test again after fixing answer_path? [Y/n]: ").lower().startswith("n"):
+            return
 
 
 def connect():
-    """Interactive: pick a transport, scaffold a target config (or show the Chrome guide),
-    then print the whole flow through to the report. Loops so a wrong pick can go back."""
+    """Interactive orchestrator: pick a transport, scaffold the config, TEST the connection
+    (shows the actual call + any connectivity problem), and on success run the suite and build
+    the report -- the whole flow, not just printed commands. Loops so a wrong pick can go back."""
     print(BANNER)
     while True:
         print(CONNECT_MENU)
-        try:
-            choice = input("choose 1-4  (h=help, q=quit): ").strip().lower()
-        except EOFError:
-            return
-        if choice in ("q", "quit", "exit"):
+        choice = _ask("choose 1-4  (h=help, q=quit): ").lower()
+        if choice in ("q", "quit", "exit", ""):
             print("bye.")
             return
         if choice in ("h", "help", "?"):
@@ -252,31 +313,19 @@ def connect():
         if choice == "4":
             guide = os.path.join(_ROOT, "docs", "CLAUDE_IN_CHROME.md")
             print("\n" + (open(guide).read() if os.path.exists(guide) else "see docs/CLAUDE_IN_CHROME.md"))
-            _print_flow("4")
+            print("\nThis path is assisted -- Claude in Chrome drives the vendor UI in your own session,")
+            print("so there is no config to auto-test here. The flow:")
+            print("  1. jinx research <vendor>        2. jinx run-sheet \"the resource to reach\"")
+            print("  3. drive each row in Chrome, logging verdicts with:  jinx log ...")
+            print("  4. jinx report                   -> out/jinx_report.html")
         elif choice in ("1", "2", "3"):
-            tmpl = {"1": "chat-api.example.json", "2": "mcp.example.json", "3": "browser.example.json"}[choice]
-            name = (input("name this target file [my-target.json]: ").strip() or "my-target.json")
-            if not name.endswith(".json"):
-                name += ".json"
-            shutil.copyfile(os.path.join(_ROOT, "examples", "targets", tmpl), name)
-            hint = {
-                "1": "Edit url / headers / body / answer_path. Keep the key in the shell: export TARGET_API_KEY=...",
-                "2": "Edit command / tool / prompt_arg / answer_path. Any server env vars go in \"env\".",
-                "3": "Edit url + the CSS selectors. First: pip install -e '.[browser]' && playwright install chromium",
-            }[choice]
-            print(f"\nwrote {name}\n{hint}")
-            _print_flow(choice, name)
+            _connect_api_like(choice)
         else:
             print("  pick 1, 2, 3 or 4  (h = help, q = quit)")
             continue
-        try:
-            again = input("\npress Enter to finish, or 'b' to go back to the menu: ").strip().lower()
-        except EOFError:
+        if _ask("\npress Enter to finish, or 'b' to go back to the menu: ").lower() not in ("b", "back"):
             return
-        if again in ("b", "back"):
-            print()
-            continue
-        return
+        print()
 
 
 def main():
