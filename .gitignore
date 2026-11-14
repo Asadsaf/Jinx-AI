@@ -1,0 +1,22 @@
+# secrets / env
+*.env
+!*.env.example
+.claude/settings.local.json
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.ipynb_checkpoints/
+*.egg-info/
+build/
+dist/
+
+# generated run state, telemetry, catcher, reports, run sheets
+out/
+
+# your own engagement run state (keep only the _template scaffold in git)
+engagements/*
+!engagements/_template/
+!engagements/_template/**

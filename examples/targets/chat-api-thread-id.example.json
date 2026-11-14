@@ -1,0 +1,22 @@
+{
+  "type": "http",
+  "name": "my-agent-threads",
+  "url": "https://api.example-vendor.com/v1/agent/chat",
+  "headers": {
+    "Authorization": "Bearer ${TARGET_API_KEY}"
+  },
+  "body": {
+    "input": "<<PROMPT>>"
+  },
+  "answer_path": [
+    "output",
+    "text"
+  ],
+  "conversation": {
+    "mode": "id",
+    "response_path": [
+      "conversation_id"
+    ],
+    "request_field": "conversation_id"
+  }
+}

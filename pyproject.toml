@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jinx-redteam"
+version = "2.2.0"
+description = "AI-agent red-team toolkit, organized by MITRE ATLAS"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Asadsaf" }]
+keywords = ["security", "red-team", "ai-agent", "prompt-injection", "llm", "mitre-atlas"]
+requires-python = ">=3.9"
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/Asadsaf/Jinx-AI"
+Issues = "https://github.com/Asadsaf/Jinx-AI/issues"
+
+[project.optional-dependencies]
+browser = ["playwright>=1.40"]
+atlas = ["pyyaml>=6"]
+
+[project.scripts]
+jinx = "jinx.__main__:main"
+
+[tool.setuptools]
+packages = ["jinx"]

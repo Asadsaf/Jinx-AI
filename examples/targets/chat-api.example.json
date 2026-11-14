@@ -1,0 +1,29 @@
+{
+  "type": "http",
+  "name": "my-agent",
+  "url": "https://api.example-vendor.com/v1/chat/completions",
+  "headers": {
+    "Authorization": "Bearer ${TARGET_API_KEY}"
+  },
+  "body": {
+    "model": "agent-model-name",
+    "messages": [
+      {
+        "role": "user",
+        "content": "<<PROMPT>>"
+      }
+    ]
+  },
+  "answer_path": [
+    "choices",
+    0,
+    "message",
+    "content"
+  ],
+  "conversation": {
+    "mode": "messages",
+    "path": [
+      "messages"
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "type": "browser",
+  "name": "vendor-ui",
+  "url": "https://app.example-vendor.com/assistant",
+  "input_sel": "textarea",
+  "send_sel": "button[type=submit]",
+  "answer_sel": "[data-role=assistant-message]:last-of-type",
+  "headless": false
+}
