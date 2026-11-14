@@ -114,6 +114,29 @@ def build():
         f'<td>{nt + nf}{" (code-exec)" if ce else ""}</td></tr>'
         for tid, nm, al, nt, nf, ce in catalog.describe())
 
+    # live run results, from the telemetry log (what actually ran this session)
+    from . import telemetry
+    live = telemetry.summary()
+    VERDICT_ORDER = ["LEAK", "RENDER-EXFIL", "TERMINAL-ESCAPE", "ECHO", "DEFENDED", "INVALID"]
+    HIT = {"LEAK", "RENDER-EXFIL", "TERMINAL-ESCAPE"}
+    live_html = ""
+    if live:
+        head = "".join(f"<th>{esc(v)}</th>" for v in VERDICT_ORDER)
+        rows = ""
+        for tgt, counts in sorted(live.items()):
+            ran = sum(counts.values())
+            hits = sum(n for v, n in counts.items() if v in HIT)
+            cells = "".join(
+                f'<td class="{"hit" if (v in HIT and counts.get(v)) else ""}">{counts.get(v, 0) or "·"}</td>'
+                for v in VERDICT_ORDER)
+            verdict = ("VULNERABLE" if hits else "DEFENDED")
+            sc = STATUS_COLOR.get(verdict, "#789")
+            rows += (f'<tr><td><b>{esc(tgt)}</b></td>'
+                     f'<td><span class="status" style="background:{sc}1a;color:{sc};border-color:{sc}55">{esc(verdict)}</span></td>'
+                     f'<td>{ran}</td>{cells}</tr>')
+        live_html = (f'<h2>Live run results <span class="muted">(from the telemetry log)</span></h2>'
+                     f'<table><tr><th>Target</th><th>Verdict</th><th>Checks ran</th>{head}</tr>{rows}</table>')
+
     # results table
     res_rows = ""
     for r in RESULTS:
@@ -165,6 +188,7 @@ th,td{{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);ver
 th{{background:var(--panel2);color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.5px}}
 tr:last-child td{{border-bottom:none}}
 .fam{{font-family:ui-monospace,Menlo,monospace;color:var(--acc)}}
+td.hit{{color:var(--acc2);font-weight:800}}
 .src{{color:var(--mut);font-size:12px}}
 .muted{{color:var(--mut);font-size:12px}}
 .chip{{font-size:11px;padding:3px 8px;border-radius:20px;border:1px solid}}
@@ -181,7 +205,7 @@ tr:last-child td{{border-bottom:none}}
 </style></head><body><div class="wrap">
 <div class="top">
   <div><div class="logo">Jin<span class="x">x</span></div>
-  <div class="tag">AI-Agent Red-Team</div></div>
+  <div class="tag">AI-Agent Red-Team · by 0xAsad</div></div>
   <div class="meta">Report generated<br><b>{today}</b></div>
 </div>
 
@@ -195,6 +219,8 @@ cross-user/tenant exposure, or an unauthorized action. Content-only jailbreaks a
 
 <h2>Combined ATLAS tests</h2>
 <table><tr><th>Test</th><th>Name</th><th>MITRE ATLAS</th><th>Techniques</th></tr>{test_rows}</table>
+
+{live_html}
 
 <h2>Assessment results</h2>
 <table><tr><th>Target</th><th>Verdict</th><th>Exercised</th><th>Mode</th><th>Findings</th></tr>{res_rows}</table>

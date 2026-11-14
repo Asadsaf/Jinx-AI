@@ -5,11 +5,13 @@ Jinx -- AI-agent red-team. Run: python -m jinx <command>
   run --target FILE [what]   run against a target from a JSON config (examples/targets/)
         what: --test JX-05 | --all-tests (default) | --battery | --pack | --combos
               | --matrix [--limit N] | --cross-turn | --multiturn "GOAL" | --sandbox
-        also: --oos TEXT --tool TEXT
+        also: --oos TEXT --tool TEXT --authorized (confirm authorization non-interactively)
         --models a,b,c   run the same suite once per model and compare (config needs
                          "<<MODEL>>" or "model_path"; or a "models" list in the config)
   connect           choose how to reach the target (API / MCP / Browser / Claude-in-Chrome)
                     and scaffold a target config to use with `run`
+  research VENDOR   scaffold engagements/VENDOR/research.md (AI surfaces, ATLAS attack
+                    patterns, public precedents) to fill in before you simulate
   models BASE [--all]  compare models run against a target: counts + every cell they disagree on
                     (--all: every cell two or more models ran)
   log --target BASE [--model M] --mode MODE --cell KEY --verdict V --why TEXT
@@ -98,6 +100,27 @@ BETTER_WAY = """
 """
 
 
+def _require_authorization(t, args):
+    from .testbed import MockAgent
+    if isinstance(t, MockAgent):
+        return
+    if "--authorized" in args or os.environ.get("JINX_AUTHORIZED"):
+        return
+    name = getattr(t, "name", "this target")
+    print("\n" + "=" * 70)
+    print("AUTHORIZATION REQUIRED")
+    print("Run Jinx only against a system you OWN or are EXPLICITLY authorized to")
+    print("test (your own account/tenant, or a program with published safe harbor).")
+    print("Unauthorized testing of someone else's agent may be illegal.")
+    print("=" * 70)
+    try:
+        answer = input(f"Type 'yes' to confirm you are authorized to test {name!r}: ").strip().lower()
+    except EOFError:
+        answer = ""
+    if answer != "yes":
+        sys.exit("aborted: authorization not confirmed (use --authorized or JINX_AUTHORIZED=1 for non-interactive runs)")
+
+
 def run(args):
     from . import harness, targets, catalog
     path = _opt(args, "--target")
@@ -106,6 +129,7 @@ def run(args):
     if not os.environ.get("JINX_NO_NOTE"):
         print(BETTER_WAY)
     t = targets.load(path)
+    _require_authorization(t, args)
     oos, tool = _opt(args, "--oos", "the restricted resource"), _opt(args, "--tool", "your tools")
 
     def suite(t):
@@ -238,6 +262,9 @@ def main():
             {"new": catcher.new, "hits": catcher.hits, "delete": catcher.delete}[sub]()
     elif cmd == "connect":
         connect()
+    elif cmd == "research" and len(args) > 1:
+        from . import research
+        print("wrote", research.generate(args[1], _ROOT))
     elif cmd == "run":
         run(args[1:])
     elif cmd == "selftest":
