@@ -205,7 +205,7 @@ td.hit{{color:var(--acc2);font-weight:800}}
 </style></head><body><div class="wrap">
 <div class="top">
   <div><div class="logo">Jin<span class="x">x</span></div>
-  <div class="tag">AI-Agent Red-Team · by 0xAsad</div></div>
+  <div class="tag">AI-Agent Red-Team · by asadr00t</div></div>
   <div class="meta">Report generated<br><b>{today}</b></div>
 </div>
 

@@ -3,7 +3,7 @@ title: "Jinx — AI-Agent Red-Team"
 message: "If you use Jinx in your research, please cite it."
 type: software
 authors:
-  - alias: 0xAsad
+  - alias: asadr00t
 repository-code: "https://github.com/Asadsaf/Jinx-AI"
 abstract: >-
   Jinx tests whether an AI agent or assistant can be made to leak data, cross a

@@ -4,7 +4,7 @@
 [![license: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![MITRE ATLAS](https://img.shields.io/badge/MITRE-ATLAS%202026.10-8A2BE2)](https://atlas.mitre.org/)
 
-> *put a hex on the agent.* — by **0xAsad**
+> *put a hex on the agent.* — by **asadr00t**
 
 **Jinx tests whether an AI agent can be made to leak data, cross a tenant boundary, or take an
 unauthorized action.** One technique library organized by [MITRE ATLAS](https://atlas.mitre.org/)
