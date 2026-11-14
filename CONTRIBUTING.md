@@ -8,7 +8,7 @@ should keep it that way.
 - **No third-party runtime dependencies.** The core runs on the Python standard library
   (3.9+). Optional extras (`[browser]`, `[atlas]`) are the only exceptions, and they stay
   optional.
-- **Every change must pass `jinx selftest` and `jinx audit`.** CI runs both on 3.9–3.12.
+- **Every change must pass `jinx selftest` and `jinx audit`** (run both locally before a PR).
   - `selftest` proves the scoring rules still catch the vulnerable test agent and clear the
     hardened ones.
   - `audit` proves no technique or planted-content family was orphaned (every one maps into

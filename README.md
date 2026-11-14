@@ -1,6 +1,5 @@
 # Jinx -- AI-Agent Red-Team
 
-[![ci](https://github.com/Asadsaf/Jinx-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Asadsaf/Jinx-AI/actions/workflows/ci.yml)
 [![python](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/)
 [![license: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![MITRE ATLAS](https://img.shields.io/badge/MITRE-ATLAS%202026.10-8A2BE2)](https://atlas.mitre.org/)

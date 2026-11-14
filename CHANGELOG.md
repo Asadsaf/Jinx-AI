@@ -12,8 +12,7 @@ All notable changes to Jinx are documented here. Format loosely follows
   probe. Bypass non-interactively with `--authorized` or `JINX_AUTHORIZED=1`.
 - Report: **Live run results** section rendered from the telemetry log (per-target verdict
   counts + how many checks ran).
-- Project files: `SECURITY.md`, `CONTRIBUTING.md`, this changelog, CI workflow, issue/PR
-  templates.
+- Project files: `SECURITY.md`, `CONTRIBUTING.md`, this changelog, issue/PR templates.
 
 ## [2.2.0]
 
