@@ -1,166 +1,176 @@
-# Jinx -- AI-Agent Red-Team
+# Jinx — AI-Agent Red-Team
 
 [![python](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/)
 [![license: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![MITRE ATLAS](https://img.shields.io/badge/MITRE-ATLAS%202026.10-8A2BE2)](https://atlas.mitre.org/)
 
-*put a hex on the agent.*  ·  by **0xAsad**
+> *put a hex on the agent.* — by **0xAsad**
 
-Jinx tests whether an AI agent or assistant can be made to leak data, cross a tenant boundary,
-or take an unauthorized action. Every test is organized by **MITRE ATLAS** (verified against
-ATLAS 2026.10). One library, one scorer, one report, across any transport.
+**Jinx tests whether an AI agent can be made to leak data, cross a tenant boundary, or take an
+unauthorized action.** One technique library organized by [MITRE ATLAS](https://atlas.mitre.org/)
+(2026.10), one scorer that gates on **real impact** — a content-only jailbreak is *not* a finding —
+and one HTML report, across any transport: **API, MCP, browser, or Claude-in-Chrome**.
 
-> **Authorized testing only.** Your own accounts and tenants, or programs with published safe
-> harbor. A content-only jailbreak is **not** a finding: Jinx scores on real impact.
+> ⚠️ **Authorized testing only.** Test your own agents and tenants, or a program with published
+> safe harbor. Every real run asks you to confirm authorization before it sends a single probe.
+> Unauthorized testing of someone else's agent may be illegal.
 
-> **💡 For the best results, add the LLM judge (`--judge`) or use the Claude-in-Chrome path
-> (option 4).** Jinx is accurate on its own — the rule-based scorer is deterministic and free —
-> but an LLM judge catches the subtle, semantic cases the rules can only mark *ambiguous*, and
-> the assisted Chrome path reaches surfaces (agents, search, automations) that a single API
-> endpoint can't. The rules stay the floor; the LLM is the amplifier. It's **off by default**
-> and never downgrades a proven hit.
-> Every non-mock `jinx run` asks you to confirm authorization before it sends a single probe
-> (bypass for scripts: `--authorized` or `JINX_AUTHORIZED=1`). Unauthorized testing of
-> someone else's agent may be illegal.
+---
 
-## Layout
-```
-jinx/                the tool
-  catalog.py         16 combined ATLAS tests (JX-01..JX-16); audit() proves nothing was dropped
-  techniques.py      32 techniques (24 chat-level, 8 code-exec only), each tagged with ATLAS ids
-  modifiers.py       5 planted-content families, 14 framings, 15 encodings, 7 combos, cross-turn
-  atlas.py           ATLAS names + tactics, generated from MITRE's official data
-  harness.py         targets (API / browser) and runners; rule-based scoring
-  targets.py         load a target from a JSON config (examples/targets/)
-  testbed.py         local test agents (vulnerable / hardened / hardened-quoting) for selftest
-  telemetry.py       append-only run log -> out/telemetry.jsonl (counts + cell diff come from here)
-  catcher.py         request catcher client (ground truth for out-of-band fetches)
-  catcher_server.py  self-hosted catcher for a domain we own
-  report.py          HTML report -> out/jinx_report.html
-  cleanup.py         teardown of our run state
-examples/targets/    target configs: chat API, browser UI, local mock
-.claude/skills/      jinx-engagement: the full per-vendor routine for Claude Code
-pyproject.toml       `pip install -e .` gives a `jinx` command
-docs/                playbooks (connect, expand, sandbox, report, HackerOne template)
-engagements/_template  copy this to start your own engagement (assessment + evidence/E-NNN.md)
-out/                 generated run state + reports (gitignored)
-```
+## Install
 
-## Install and use (terminal)
-Jinx is a plain Python command-line tool (Python 3.9+, no third-party engine). Claude is not
-required to run it.
+Pure Python 3.9+, **no dependencies**.
+
 ```bash
 git clone https://github.com/Asadsaf/Jinx-AI.git && cd Jinx-AI
-pipx install --editable .            # puts the `jinx` command on your PATH (recommended)
-# or:  python3 -m pip install -e .   # needs pip >= 21.3
-# or, zero install:  python3 -m jinx <command>   # works from the repo, no install at all
-jinx selftest                        # scoring check against local test agents; must say OK
-jinx info                            # library stats + audit
+pipx install --editable .        # recommended — puts `jinx` on your PATH
 ```
-Run against a target:
+*Alternatives:* `pip install -e .` (pip ≥ 21.3), or zero-install `python3 -m jinx <command>`.
+
 ```bash
-jinx connect                                                # 1. choose API / MCP / Browser / Claude-in-Chrome, scaffold a config
-jinx research my-vendor                                      # 2. scaffold engagements/my-vendor/research.md (surfaces, ATLAS patterns, public vulns)
-cp examples/targets/chat-api.example.json my-target.json    # or copy a template yourself
-export TARGET_API_KEY=...                                   # secrets stay in the shell, never in the file
-jinx catcher new                                            # endpoint for out-of-band fetches
-jinx run --target my-target.json                            # 3. confirm authorization, then run all 16 ATLAS tests
-jinx run --target my-target.json --pack                     # 30 planted-content cells (--combos 35, --matrix 1050)
-jinx run --target my-target.json --cross-turn               # split payload over 3 turns of one conversation
-jinx run --target my-target.json --escalate                 # adaptive pressure ladder: climbs low->high, stops at first hit
-jinx run --target my-target.json --judge                    # + LLM second opinion on ambiguous verdicts (recommended)
-jinx catcher hits                                           # ground truth
-jinx status                                                 # verdict counts, from the telemetry log
-jinx diff my-agent other-agent                              # cell-by-cell difference between two targets
-jinx report                                                 # 4. out/jinx_report.html (live verdicts + every check that ran)
+jinx selftest     # scoring sanity-check — must say OK
+jinx info         # 16 tests · 32 techniques · 1050-variant matrix
 ```
-**Multi-turn over an API** (`--cross-turn`, `--multiturn "GOAL"`, `--sandbox`) needs the target to
-remember earlier turns. Add a `conversation` block to the config:
-`{"mode": "messages", "path": ["messages"]}` when the API wants the full history each time
-(see `examples/targets/chat-api.example.json`), or
-`{"mode": "id", "response_path": [...], "request_field": "..."}` (or `"request_header"`) when it
-returns a conversation id (`chat-api-thread-id.example.json`). Without it every turn is a new
-chat, and multi-turn results are marked INVALID instead of DEFENDED.
 
-**LLM judge** (optional, recommended — a second opinion on the ambiguous cases):
+**Try it instantly** against the built-in mock agent (no setup, no target):
 ```bash
-export JUDGE_BASE_URL=https://api.your-llm.com/v1   # any chat-completions-compatible endpoint
-export JUDGE_MODEL=your-model                       # (or reuse ADV_BASE_URL / ADV_MODEL / ADV_API_KEY)
-export JUDGE_API_KEY=...                            # kept in the shell, never in a file
-jinx run --target my-target.json --judge           # 2nd opinion on ambiguous verdicts
-jinx manual --target chrome-agent --judge          # same, in the copy-paste flow
-jinx report --judge                                 # + an analyst wrap-up in the report
+jinx run --target examples/targets/mcp-mock.json --authorized --escalate
+jinx report       # → out/jinx_report.html
 ```
-Off by default (scoring stays deterministic and free). It only reviews **ambiguous** verdicts
-(ECHO / DEFENDED / INVALID) and **never downgrades a proven hit** — a changed verdict is tagged
-`LEAK (LLM judge; rules said DEFENDED)`. The 1050-cell matrix stays rule-based (to avoid ~1000
-LLM calls). With nothing configured, `--judge` prints a note and falls back to rule-based.
 
-**Model sweep** (does the result depend on the model behind the agent?):
+---
+
+## The flow
+
+```
+   connect  →  research  →  run  →  report
+```
+
 ```bash
-jinx run --target my-target.json --models model-a,model-b,model-c --pack   # same suite, once per model
-jinx models my-agent              # verdict counts per model + every cell where they disagree (--all: all shared cells)
+jinx connect            # 1. pick a transport, scaffold + TEST the connection
+jinx research <vendor>  # 2. draft attack-surface notes to fill in before you run
+jinx run --target T     # 3. confirm authorization, run the ATLAS tests
+jinx report             # 4. → out/jinx_report.html (verdicts + every check that ran)
 ```
-The config marks where the model goes: `"<<MODEL>>"` anywhere in url/headers/body, or
-`"model_path": ["model"]`, or a default `"models": [...]` list. Each model is logged as its own
-target `my-agent@<model>`. For UI-only platforms where the model is chosen vendor-side (an agent
-per model, as on Snowflake), record each verdict with
-`jinx log --target my-agent --model <model> --mode <mode> --cell <key> --verdict DEFENDED --why "..."`
-and `jinx models my-agent` compares them the same way.
 
-**The better way:** `jinx run` reaches one API endpoint. For a full engagement, open the repo
-in Claude Code with the Claude in Chrome extension and say "run jinx on <vendor>": the
-`jinx-engagement` skill drives the vendor's own UI in your logged-in session across every
-surface, plants payloads for indirect injection, checks the catcher and writes the evidence.
-`jinx run` and `jinx run-sheet` print this note (hide it with `JINX_NO_NOTE=1`).
+`connect` is an **orchestrator**, not a menu: it scaffolds the config, **tests the connection**
+(shows the real call, and tells you if the agent is unreachable, erroring, or returning nothing —
+i.e. the techniques can't run), and on a green check runs the suite and builds the report for you.
 
-Four ways to reach a target — `jinx connect` is an interactive **orchestrator**: it scaffolds
-the config, **tests the connection** (shows the actual call and tells you if the agent is
-unreachable, erroring, or returning nothing — i.e. the techniques can't run), and on success
-runs the suite and builds the report for you (docs/CONNECT_QUICK.md):
-- **API** (`"type": "http"`): fully automated from the terminal.
-- **MCP** (`"type": "mcp"`): the agent is exposed over the Model Context Protocol; Jinx is the MCP
-  client and calls its tool once per probe. Try it offline: `jinx run --target examples/targets/mcp-mock.json`.
-- **Browser, scripted** (`"type": "browser"`, `pip install -e '.[browser]'` then `playwright install chromium`):
-  opens the vendor UI, you log in once, Jinx types and reads the answers.
-- **Claude in Chrome** (assisted): drive the vendor's own UI in your logged-in browser — the most
-  flexible transport, it reaches surfaces an API can't. Full steps: **docs/CLAUDE_IN_CHROME.md**. In
-  Claude Code the `jinx-engagement` skill runs the whole routine ("run jinx on &lt;vendor&gt;").
+---
 
-Other commands: `jinx catalog`, `jinx atlas`, `jinx engage new <vendor>`, `jinx bundle <vendor>`,
-`jinx catcher serve` (self-hosted catcher), `jinx cleanup [--apply]`, `jinx docs`.
+## 4 ways to connect
 
-### Verdicts
-LEAK (canary in live markup, or a canary the agent could only get from its own data) /
-RENDER-EXFIL / TERMINAL-ESCAPE / ECHO (canary only quoted back; check the catcher) / DEFENDED /
-INVALID (multi-turn run against a target that forgets earlier turns).
-Code in backticks is ignored, since it never renders. `jinx selftest` proves these rules on
-known-vulnerable and known-hardened agents before any vendor run.
+| # | Transport | Use when | How it works |
+|---|-----------|----------|--------------|
+| 1 | **API (HTTP)** | the agent has a REST / chat API | fully automated from the terminal |
+| 2 | **MCP** | the agent speaks Model Context Protocol | Jinx is the MCP client, calls its tool once per probe |
+| 3 | **Browser** | a UI-only agent | scripted (Playwright) **or** manual copy-paste |
+| 4 | **Claude in Chrome** ⭐ | anything — reaches surfaces an API can't | Claude drives the vendor's UI in *your* logged-in session |
 
-### Catcher on our own domain
-Some agents refuse to fetch well-known request-bin domains on reputation alone, which leaves
-the result inconclusive. Run `jinx catcher serve --port 8080` on a host behind a plain domain
-we own, then set `JINX_CATCHER_SELF=https://that-domain` and `JINX_CATCHER_KEY=<printed key>`
-where Jinx runs. Without them Jinx uses the request-bin service at `JINX_CATCHER_API`.
+Secrets stay in env vars (`${API_KEY}`), never in the config file. Saved connections live in
+`targets/` — list them any time with **`jinx targets --check`** (shows which are LIVE).
 
-## How a test is built
-technique (what to make the agent do) -> framing (how it is asked) -> encoding (how it is hidden)
--> delivery (direct message or planted content). `jinx/catalog.py` bundles related techniques
-under one ATLAS test so one run covers what used to take several.
+> **💡 For the best results, use option 4 (Claude in Chrome) or add `--judge`.** The rule-based
+> scorer is accurate, deterministic and free — but the LLM judge catches subtle semantic cases,
+> and the Chrome path reaches surfaces (agents, search, automations) a single API can't.
 
-## Connect (4 ways) -- `jinx connect` chooses one and scaffolds a config; see docs/CONNECT_QUICK.md
-- **A. API** (`HTTPTarget`) -- automated, for agents with an API.
-- **B. MCP** (`MCPTarget`) -- for agents exposed over the Model Context Protocol.
-- **C. Browser, scripted** (`BrowserTarget`, Playwright) -- for UI-only agents.
-- **D. Claude in Chrome** -- drive the vendor UI in your own logged-in session; see docs/CLAUDE_IN_CHROME.md.
+---
 
-## Teardown
-`python -m jinx cleanup --apply` deletes our catcher and local run state. Engagement-specific
-teardown (planted content, test accounts, installed CLIs) lives in `engagements/<vendor>/`.
-Jinx never touches credentials or anyone else's account.
+## Run modes
 
-## Status
-Beta, open-source. The technique library is organized by MITRE ATLAS and proven by `jinx selftest`
-against the bundled local test agents (`jinx/testbed.py`) before any run. Techniques are derived from
-public prompt-injection research and CVEs. Run Jinx only against systems you own or are explicitly
-authorized to test.
+| Command | What it does |
+|---------|--------------|
+| `jinx run --target T` | all 16 ATLAS tests, in order |
+| `… --pack` / `--combos` / `--matrix` | 30 / 35 / 1050 planted-content variants |
+| `… --cross-turn` | split a payload across 3 turns of one conversation |
+| `… --escalate` | adaptive pressure ladder — climbs low → high, stops at first hit |
+| `… --judge` | LLM second opinion on ambiguous verdicts *(recommended)* |
+| `… --models a,b,c` | run once per model, then `jinx models T` compares them cell-by-cell |
+| `jinx manual --target T` | copy-paste flow: you run each prompt in the UI, paste the reply, Jinx scores it |
+
+**Verdicts:** `LEAK` · `RENDER-EXFIL` · `TERMINAL-ESCAPE` · `ECHO` (quoted back — not proof) ·
+`DEFENDED` · `INVALID`. Code in backticks is ignored (it never renders). Scoring is deterministic
+and proven by `jinx selftest` on known-vulnerable and known-hardened agents before any real run.
+
+### LLM judge (optional, recommended)
+A second opinion on the **ambiguous** cases — **off by default, and it never downgrades a proven hit.**
+```bash
+export JUDGE_BASE_URL=... JUDGE_MODEL=... JUDGE_API_KEY=...   # any chat-completions endpoint (or reuse ADV_*)
+jinx run --target T --judge      # judge ambiguous verdicts
+jinx report --judge              # + an analyst wrap-up in the report
+```
+The rules are the floor; the LLM is the amplifier. The 1050-cell matrix stays rule-based.
+
+---
+
+## Reporting a vulnerability
+
+A confirmed Jinx finding has **proven impact** — a leak, cross-tenant exposure, or an unauthorized
+action — not just a jailbroken reply. Report it **responsibly to the vendor that owns the agent**,
+and never publicly first. Common channels:
+
+- **Bug-bounty / VDP platforms** — [HackerOne](https://hackerone.com), [Bugcrowd](https://bugcrowd.com),
+  [Intigriti](https://intigriti.com), [YesWeHack](https://yeswehack.com), if the vendor runs one.
+- **The vendor's security contact** — `security@<vendor>`, or the address in their
+  [`/.well-known/security.txt`](https://securitytxt.org/).
+- **Coordinated disclosure** — give the vendor time to fix before going public; request a CVE if warranted.
+
+Jinx ships a ready report template at **`docs/HACKERONE_TEMPLATE.md`** (adapt it for any channel), and
+`jinx bundle <vendor>` packs your engagement evidence into one handoff archive. Always include:
+**impact, CVSS, reproduction steps, and the evidence** (the report + catcher hits).
+
+---
+
+## Reference
+
+<details>
+<summary><b>More commands</b></summary>
+
+```
+jinx targets [--check]     list saved connections (and ping them)
+jinx catalog | atlas       the ATLAS tests / every technique + tactics
+jinx catcher new|hits      out-of-band fetch endpoint + ground truth
+jinx diff A B              cell-by-cell difference between two targets
+jinx engage new <vendor>   start an engagement from the template
+jinx bundle <vendor>       pack an engagement into a handoff archive
+jinx run-sheet "<oos>"     export a manual run sheet (for UI runs)
+jinx cleanup [--apply]     tear down local run state
+jinx docs                  list the playbooks in docs/
+```
+</details>
+
+<details>
+<summary><b>Advanced: multi-turn & a self-hosted catcher</b></summary>
+
+**Multi-turn** (`--cross-turn`, `--escalate`, `--multiturn "GOAL"`, `--sandbox`) needs the target to
+remember earlier turns. Add a `conversation` block to the config: `{"mode":"messages","path":["messages"]}`
+when the API wants the whole history each time, or `{"mode":"id","response_path":[...],"request_field":"..."}`
+when it returns a conversation id. Without it, every turn is a fresh chat and results are marked `INVALID`.
+
+**Catcher on your own domain** — some agents refuse well-known request-bin domains. Run
+`jinx catcher serve --port 8080` behind a plain domain you own, then set `JINX_CATCHER_SELF` and
+`JINX_CATCHER_KEY` where Jinx runs. Otherwise Jinx uses the request-bin at `JINX_CATCHER_API`.
+</details>
+
+<details>
+<summary><b>Repo map</b></summary>
+
+```
+jinx/              the tool (catalog, techniques, modifiers, harness, report, …)
+examples/targets/  ready configs: chat API, MCP, browser, local mock
+targets/           your saved connections (git-ignored)
+engagements/       per-engagement evidence (start from _template/)
+docs/              playbooks + the vulnerability-report template
+out/               generated reports + run log (git-ignored)
+```
+</details>
+
+**For a full engagement**, open the repo in Claude Code with the Claude-in-Chrome extension and say
+*"run jinx on &lt;vendor&gt;"* — the `jinx-engagement` skill drives every surface, plants payloads for
+indirect injection, checks the catcher, and writes the evidence.
+
+---
+
+**License** [MIT](LICENSE) · **Status** Beta · Techniques derived from public prompt-injection
+research and CVEs. Run Jinx only against systems you own or are explicitly authorized to test.
