@@ -20,3 +20,6 @@ out/
 engagements/*
 !engagements/_template/
 !engagements/_template/**
+
+# saved connection configs (local; may hold real URLs)
+targets/

@@ -190,52 +190,57 @@ class MCPTarget(Target):
 
 
 # ---------------------------------------------------------------- connectivity preflight
-def preflight(target):
+def preflight(target, quiet=False):
     """Actually reach the target with ONE benign probe and report, so you know BEFORE a run
     whether the techniques can run at all. Shows the call being made, the reply or the error,
-    and a plain verdict. Returns {"ok": True/False/None, "reason"/"answer", "fatal"}.
+    and a plain verdict. quiet=True suppresses the detail (for listing many targets) and only
+    returns the dict. Returns {"ok": True/False/None, "reason"/"answer", "fatal"}.
       ok True  -> the agent answered; techniques can run.
       ok False -> unreachable / API error / empty answer; the run would be pointless.
       ok None  -> a transport we can't auto-test (browser, assisted Chrome)."""
     import socket
     import urllib.error
+
+    def say(*a):
+        if not quiet:
+            print(*a)
     ping = "Connectivity check only: reply with the single word READY."
-    print(f"\n--- connectivity preflight: {target.name} ---")
+    say(f"\n--- connectivity preflight: {target.name} ---")
     if isinstance(target, HTTPTarget):
         url = os.path.expandvars(target.cfg.get("url", ""))
         method = target.cfg.get("method", "POST")
         hdrs = {k: ("<redacted>" if ("$" in v or "key" in k.lower() or "auth" in k.lower()) else v)
                 for k, v in target.cfg.get("headers", {}).items()}
-        print(f"  call   : {method} {url or '(no url)'}")
-        print(f"  headers: {hdrs or '{}'}")
-        print(f"  body   : {json.dumps(_fill(target.cfg.get('body', {}), ping))[:200]}")
+        say(f"  call   : {method} {url or '(no url)'}")
+        say(f"  headers: {hdrs or '{}'}")
+        say(f"  body   : {json.dumps(_fill(target.cfg.get('body', {}), ping))[:200]}")
         if (not url) or "example" in url or "<" in url or "your-" in url:
-            print("  ✗ the config still has a PLACEHOLDER url -- edit the target file first.")
+            say("  ✗ the config still has a PLACEHOLDER url -- edit the target file first.")
             return {"ok": False, "reason": "placeholder url", "fatal": True}
     elif isinstance(target, MCPTarget):
-        print(f"  call   : launch {' '.join(target.cfg.get('command', []))}  ->  tools/call {target.tool!r}")
+        say(f"  call   : launch {' '.join(target.cfg.get('command', []))}  ->  tools/call {target.tool!r}")
     else:
-        print(f"  (no automated preflight for {type(target).__name__}; test it by hand)")
+        say(f"  (no automated preflight for {type(target).__name__}; test it by hand)")
         return {"ok": None, "reason": "manual transport"}
     try:
         resp = target.send(ping)
     except (urllib.error.URLError, socket.error, OSError) as e:
-        print(f"  ✗ CONNECTION FAILED: {e}")
-        print("  => the agent is NOT reachable. No techniques can run until this is fixed.")
+        say(f"  ✗ CONNECTION FAILED: {e}")
+        say("  => the agent is NOT reachable. No techniques can run until this is fixed.")
         return {"ok": False, "reason": str(e), "fatal": True}
     except Exception as e:  # noqa: BLE001  (MCP launch / JSON-RPC errors land here)
-        print(f"  ✗ ERROR reaching the agent: {e}")
-        print("  => no techniques can run until this is fixed.")
+        say(f"  ✗ ERROR reaching the agent: {e}")
+        say("  => no techniques can run until this is fixed.")
         return {"ok": False, "reason": str(e), "fatal": True}
     text = resp.get("text") or ""
     if text.startswith("[HTTP "):
-        print(f"  ✗ the API returned an error: {text[:160]}")
-        print("  => fix auth / url / body. Every technique would fail the same way.")
+        say(f"  ✗ the API returned an error: {text[:160]}")
+        say("  => fix auth / url / body. Every technique would fail the same way.")
         return {"ok": False, "reason": text[:160], "fatal": True}
     if not text.strip():
-        print("  ! connected, but the reply was EMPTY.")
-        print("    Either the agent returned nothing, or answer_path is wrong so Jinx can't read")
-        print("    the reply -- every technique would score INVALID. Check answer_path in the config.")
+        say("  ! connected, but the reply was EMPTY.")
+        say("    Either the agent returned nothing, or answer_path is wrong so Jinx can't read")
+        say("    the reply -- every technique would score INVALID. Check answer_path in the config.")
         return {"ok": False, "reason": "empty answer / wrong answer_path", "fatal": False}
     print(f"  ✓ reachable -- the agent replied: {text[:160]!r}")
     print("  => the agent responds; the techniques can run.")

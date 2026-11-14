@@ -6,6 +6,14 @@ All notable changes to Jinx are documented here. Format loosely follows
 ## [Unreleased]
 
 ### Added
+- **Saved connections** — target configs live in `targets/` (git-ignored); `jinx targets`
+  lists them with type/name, `jinx targets --check` pings each (LIVE / not reachable), and
+  `jinx run --target <name>` resolves a bare name to `targets/<name>.json`. `connect` saves
+  there.
+- **Manual copy-paste flow** (`jinx manual`) — for a UI / assisted agent with no API: Jinx
+  prints each prompt in order, you run it in the agent and paste the reply, and it scores with
+  the SAME rule-based scorer and saves it (feeds the report). `connect` option 3 offers it
+  (vs scripted Playwright) and option 4 (Claude in Chrome) starts it as the recorder.
 - **Adaptive escalation ladder** (`jinx run --target … --escalate`) — one conversation that
   reframes the same leak ask at increasing pressure (plain → context → authority → policy →
   direct). The next rung is chosen from the last verdict (a hit stops it, an ECHO keeps

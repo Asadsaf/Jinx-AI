@@ -14,6 +14,9 @@ Jinx -- AI-agent red-team. Run: python -m jinx <command>
                     and scaffold a target config to use with `run`
   research VENDOR   scaffold engagements/VENDOR/research.md (AI surfaces, ATLAS attack
                     patterns, public precedents) to fill in before you simulate
+  targets [--check] list saved connections (targets/*.json); --check pings each one
+  manual [--target NAME] [--test JX-05]   copy-paste run for a UI / assisted agent:
+                    Jinx prints each prompt, you paste the reply, it scores + saves it
   models BASE [--all]  compare models run against a target: counts + every cell they disagree on
                     (--all: every cell two or more models ran)
   log --target BASE [--model M] --mode MODE --cell KEY --verdict V --why TEXT
@@ -125,7 +128,7 @@ def _require_authorization(t, args):
 
 def run(args):
     from . import harness, targets, catalog
-    path = _opt(args, "--target")
+    path = _resolve_target(_opt(args, "--target"))
     if not path:
         sys.exit("usage: python -m jinx run --target examples/targets/mock.json [--test JX-05 ...]")
     if not os.environ.get("JINX_NO_NOTE"):
@@ -255,18 +258,26 @@ def _offer_run(name):
 
 
 def _connect_api_like(choice):
-    """Options 1-3: scaffold the config, show how to edit it, preflight the connection, and
-    (on a green preflight for an API/MCP target) offer to run the suite + report right here."""
+    """Options 1-3: scaffold the config into targets/, show how to edit it, preflight the
+    connection, and (on a green preflight) offer to run the suite + report right here.
+    Option 3 first offers the manual copy-paste flow instead of scripted Playwright."""
     from . import harness, targets
+    if choice == "3":
+        how = _ask("  3a) scripted Playwright (auto-types in the UI)  3m) manual copy-paste (you drive)\n  choose 3a / 3m [3m]: ").lower()
+        if how in ("", "3m", "m", "manual"):
+            nm = _ask("name this target (for the report) [ui-agent]: ") or "ui-agent"
+            manual(["--target", nm])
+            return
     tmpl = {"1": "chat-api.example.json", "2": "mcp.example.json", "3": "browser.example.json"}[choice]
-    name = _safe_target_name(_ask("name this target file [my-target.json]: ") or "my-target.json")
+    os.makedirs(_TARGETS_DIR, exist_ok=True)
+    name = os.path.join(_TARGETS_DIR, _safe_target_name(_ask("name this connection [my-target]: ") or "my-target"))
     shutil.copyfile(os.path.join(_ROOT, "examples", "targets", tmpl), name)
     hint = {
         "1": "Edit url / headers / body / answer_path. Keep the key in the shell: export TARGET_API_KEY=...",
         "2": "Edit command / tool / prompt_arg / answer_path. Any server env vars go in \"env\".",
         "3": "Edit url + the CSS selectors. First: pip install -e '.[browser]' && playwright install chromium",
     }[choice]
-    print(f"\nwrote {name}\n{hint}")
+    print(f"\nwrote {os.path.relpath(name)}  (saved connection -- see it anytime with: jinx targets)\n{hint}")
     print("\nResearch the vendor first (optional):  jinx research <vendor>")
     while True:
         action = _ask(f"\nedit {name}, then: Enter = test the connection | r = research | s = skip test | b = back: ").lower()
@@ -314,10 +325,13 @@ def connect():
             guide = os.path.join(_ROOT, "docs", "CLAUDE_IN_CHROME.md")
             print("\n" + (open(guide).read() if os.path.exists(guide) else "see docs/CLAUDE_IN_CHROME.md"))
             print("\nThis path is assisted -- Claude in Chrome drives the vendor UI in your own session,")
-            print("so there is no config to auto-test here. The flow:")
-            print("  1. jinx research <vendor>        2. jinx run-sheet \"the resource to reach\"")
-            print("  3. drive each row in Chrome, logging verdicts with:  jinx log ...")
-            print("  4. jinx report                   -> out/jinx_report.html")
+            print("so there is no config to auto-test. Two ways to record what you find:")
+            print("  - let Claude Code run the `jinx-engagement` skill end-to-end, or")
+            print("  - use the copy-paste recorder here: Jinx prints each prompt, you (or Claude)")
+            print("    run it in the UI and paste the reply, Jinx scores + saves it, feeds the report.")
+            if not _ask("\nstart the copy-paste recorder now? [Y/n]: ").lower().startswith("n"):
+                nm = _ask("name this target (for the report) [chrome-agent]: ") or "chrome-agent"
+                manual(["--target", nm])
         elif choice in ("1", "2", "3"):
             _connect_api_like(choice)
         else:
@@ -326,6 +340,105 @@ def connect():
         if _ask("\npress Enter to finish, or 'b' to go back to the menu: ").lower() not in ("b", "back"):
             return
         print()
+
+
+_TARGETS_DIR = os.path.join(_ROOT, "targets")
+
+
+def _resolve_target(path):
+    """Let --target take a bare saved name (resolves to targets/<name>.json) or a real path."""
+    if path and not os.path.exists(path):
+        cand = os.path.join(_TARGETS_DIR, path if path.endswith(".json") else path + ".json")
+        if os.path.exists(cand):
+            return cand
+    return path
+
+
+def list_targets(check=False):
+    """Show the saved connections (targets/*.json) so you can see what is already set up --
+    including whether an MCP (or any) target is connected. --check pings each one."""
+    import glob
+    import json as _json
+    from . import harness, targets as tg
+    print(BANNER)
+    files = sorted(glob.glob(os.path.join(_TARGETS_DIR, "*.json")))
+    if not files:
+        print(f"no saved connections yet (none in {os.path.relpath(_TARGETS_DIR)}/).")
+        print("make one:  jinx connect")
+        return
+    print(f"saved connections (in {os.path.relpath(_TARGETS_DIR)}/):\n")
+    for f in files:
+        try:
+            cfg = _json.load(open(f))
+            typ, nm = cfg.get("type", "http"), cfg.get("name", "?")
+        except Exception:  # noqa: BLE001
+            typ, nm = "?", "unreadable"
+        line = f"  {os.path.basename(f):28s} type={typ:7s} name={nm}"
+        if check:
+            try:
+                r = harness.preflight(tg.load(f), quiet=True)
+                line += "   -> " + {True: "LIVE", False: "not reachable", None: "manual (test by hand)"}[r.get("ok")]
+            except Exception:  # noqa: BLE001
+                line += "   -> error launching"
+        print(line)
+    print(f"\nrun one:  jinx run --target <name>        (a bare name resolves here)")
+
+
+def _read_pasted():
+    """Read a pasted multi-line reply; end with a line containing only '.'  First-line
+    commands: skip / quit / back."""
+    lines = []
+    while True:
+        try:
+            line = input()
+        except EOFError:
+            break
+        low = line.strip().lower()
+        if not lines and low in ("skip", "s"):
+            return "__SKIP__"
+        if not lines and low in ("quit", "q", "exit"):
+            return "__QUIT__"
+        if line.strip() == ".":
+            break
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def manual(args):
+    """Copy-paste flow for a UI / assisted agent (option 3 manual, or Claude in Chrome): Jinx
+    prints each prompt, you run it in the agent yourself and paste the reply, Jinx scores it
+    with the SAME rule-based scorer and saves it. No API or Playwright needed. Feeds the report."""
+    from . import harness, catalog, telemetry
+    name = _opt(args, "--target", "manual-target")
+    oos, tool = _opt(args, "--oos", "the restricted resource"), _opt(args, "--tool", "your tools")
+    ids = [_opt(args, "--test")] if "--test" in args else [x["id"] for x in catalog.TESTS]
+    print(BANNER)
+    print(f"Manual copy-paste run against {name!r}  ({len(ids)} ATLAS tests, in order).")
+    print("For each test: copy the PROMPT, run it in the agent, paste the agent's full reply,")
+    print("then a line with only '.' to score it.  First line 'skip' or 'quit' to control.\n")
+    done = 0
+    for n, tid in enumerate(ids, 1):
+        combined, parts = catalog.bundle(tid, oos=oos, tool=tool)
+        if not parts:
+            continue
+        print("=" * 72)
+        print(f"[{n}/{len(ids)}] {tid}\n--- PROMPT (copy everything below) ---\n{combined}\n--- end prompt ---")
+        print("paste the agent's reply, finish with a line containing only '.'  (skip / quit):")
+        pasted = _read_pasted()
+        if pasted == "__QUIT__":
+            break
+        if pasted == "__SKIP__":
+            print("  skipped\n")
+            continue
+        v, why = harness.score({"text": pasted}, sent=combined)
+        telemetry.log("send", target=name, mode="manual", test=tid, delivery="paste")
+        telemetry.log("verdict", target=name, mode="manual", test=tid, cell=tid, verdict=v, why=why)
+        print(f"  => {v} ({why})\n")
+        done += 1
+    print(f"\nscored {done} test(s); logged to {telemetry.PATH}")
+    if done and not _ask("build the HTML report now? [Y/n]: ").lower().startswith("n"):
+        from . import report
+        print("wrote", report.write(), "-- open it in a browser")
 
 
 def main():
@@ -369,6 +482,10 @@ def main():
             {"new": catcher.new, "hits": catcher.hits, "delete": catcher.delete}[sub]()
     elif cmd == "connect":
         connect()
+    elif cmd == "targets":
+        list_targets(check="--check" in args)
+    elif cmd == "manual":
+        manual(args[1:])
     elif cmd == "research" and len(args) > 1:
         from . import research
         print("wrote", research.generate(args[1], _ROOT))
