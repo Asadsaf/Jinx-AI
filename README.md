@@ -1,6 +1,6 @@
 # Jinx -- AI-Agent Red-Team
 
-*put a hex on the agent.*
+*put a hex on the agent.*  ·  by **0xAsad**
 
 Jinx tests whether an AI agent or assistant can be made to leak data, cross a tenant boundary,
 or take an unauthorized action. Every test is organized by **MITRE ATLAS** (verified against
