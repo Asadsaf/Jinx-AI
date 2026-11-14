@@ -4,7 +4,9 @@ Jinx -- AI-agent red-team. Run: python -m jinx <command>
 
   run --target FILE [what]   run against a target from a JSON config (examples/targets/)
         what: --test JX-05 | --all-tests (default) | --battery | --pack | --combos
-              | --matrix [--limit N] | --cross-turn | --multiturn "GOAL" | --sandbox
+              | --matrix [--limit N] | --cross-turn | --escalate | --multiturn "GOAL" | --sandbox
+        --escalate   adaptive pressure ladder in one conversation (no adversary model),
+                     climbs low -> high and stops at the first hit
         also: --oos TEXT --tool TEXT --authorized (confirm authorization non-interactively)
         --models a,b,c   run the same suite once per model and compare (config needs
                          "<<MODEL>>" or "model_path"; or a "models" list in the config)
@@ -142,6 +144,8 @@ def run(args):
             _tally([v for _c, v in res])
         elif "--cross-turn" in args:
             harness.run_cross_turn(t)
+        elif "--escalate" in args:
+            harness.run_escalation(t, oos=oos, tool=tool)
         elif "--multiturn" in args:
             harness.run_multiturn(t, _opt(args, "--multiturn", "make the agent reveal the canary"))
         elif "--sandbox" in args:

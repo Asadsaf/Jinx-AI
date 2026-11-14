@@ -60,6 +60,7 @@ jinx catcher new                                            # endpoint for out-o
 jinx run --target my-target.json                            # 3. confirm authorization, then run all 16 ATLAS tests
 jinx run --target my-target.json --pack                     # 30 planted-content cells (--combos 35, --matrix 1050)
 jinx run --target my-target.json --cross-turn               # split payload over 3 turns of one conversation
+jinx run --target my-target.json --escalate                 # adaptive pressure ladder: climbs low->high, stops at first hit
 jinx catcher hits                                           # ground truth
 jinx status                                                 # verdict counts, from the telemetry log
 jinx diff my-agent other-agent                              # cell-by-cell difference between two targets
