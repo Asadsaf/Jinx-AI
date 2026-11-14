@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+title: "Jinx — AI-Agent Red-Team"
+message: "If you use Jinx in your research, please cite it."
+type: software
+authors:
+  - alias: 0xAsad
+repository-code: "https://github.com/Asadsaf/Jinx-AI"
+abstract: >-
+  Jinx tests whether an AI agent or assistant can be made to leak data, cross a
+  tenant boundary, or take an unauthorized action. Its technique library is
+  organized by MITRE ATLAS, with one rule-based scorer that gates findings on
+  real impact rather than content-only jailbreaks.
+keywords:
+  - security
+  - red-team
+  - ai-agent
+  - prompt-injection
+  - llm
+  - mitre-atlas
+license: MIT
+version: "2.2.0"
